@@ -1,6 +1,6 @@
 // render.js — renders a phase (fields, CRAFT layout, radio calls, tips) into the DOM.
 
-import { PHASES, CRAFT_LETTERS } from "./phases.js";
+import { PHASES, CRAFT_LETTERS, REQUIRED_FIELDS } from "./phases.js";
 import {
   getState, setField, setFields, setPilotId, getPilotId, resetFlight,
 } from "./state.js";
@@ -31,6 +31,10 @@ function el(tag, attrs = {}, children = []) {
 function renderField(field) {
   const state = getState();
   const isTextarea = field.type === "textarea";
+  const required = REQUIRED_FIELDS.has(field.id);
+  const value = state[field.id] || "";
+  const invalid = required && !String(value).trim();
+
   const input = el(isTextarea ? "textarea" : "input", {
     class: isTextarea ? "field__textarea" : "field__input",
     id: `f-${field.id}`,
@@ -39,16 +43,27 @@ function renderField(field) {
     autocomplete: "off",
     autocorrect: "off",
     spellcheck: "false",
+    "aria-invalid": invalid ? "true" : "false",
   });
   if (!isTextarea) input.type = "text";
-  input.value = state[field.id] || "";
+  input.value = value;
 
   input.addEventListener("input", (e) => {
     setField(field.id, e.target.value);
   });
 
-  const wrap = el("div", { class: "field" + (field.wide ? " field--wide" : "") }, [
-    el("label", { class: "field__label", for: `f-${field.id}` }, field.label),
+  const labelChildren = [field.label];
+  if (required) {
+    labelChildren.push(el("span", { class: "field__req", "aria-hidden": "true" }, " *"));
+  }
+
+  const classes = ["field"];
+  if (field.wide) classes.push("field--wide");
+  if (required) classes.push("field--required");
+  if (invalid) classes.push("field--invalid");
+
+  const wrap = el("div", { class: classes.join(" ") }, [
+    el("label", { class: "field__label", for: `f-${field.id}` }, labelChildren),
     input,
   ]);
   return wrap;

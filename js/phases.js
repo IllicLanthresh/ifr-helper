@@ -458,3 +458,42 @@ export const CRAFT_LETTERS = [
   { letter: "F", fieldId: "craftFrequency" },
   { letter: "T", fieldId: "craftSquawk" },
 ];
+
+// -------------------------------------------------------------------------
+// REQUIRED_FIELDS: auto-derived set of every field ID that appears in any
+// radio-call template across the whole app (ICAO or FAA variant). These are
+// the fields whose absence would leave a blank in an actual radio call, so
+// they get the red "needs filling" treatment in the UI.
+//
+// Purely-informational fields (notes, scratchpad, cargo, cost index, etc.)
+// are NOT in this set and are treated as optional.
+// -------------------------------------------------------------------------
+const TOKEN_RE = /\{\{\s*([a-zA-Z0-9_]+)/g;
+
+export const REQUIRED_FIELDS = (() => {
+  const set = new Set();
+  const scan = (str) => {
+    if (typeof str !== "string") return;
+    let m;
+    TOKEN_RE.lastIndex = 0;
+    while ((m = TOKEN_RE.exec(str)) !== null) set.add(m[1]);
+  };
+  for (const phase of PHASES) {
+    for (const call of phase.calls || []) {
+      const t = call.text;
+      if (typeof t === "string") scan(t);
+      else if (t && typeof t === "object") for (const v of Object.values(t)) scan(v);
+    }
+  }
+  return set;
+})();
+
+// For a given phase, return the IDs of its own fields that are required but
+// currently empty in the supplied state. Used for per-phase "missing" counts.
+export function missingFieldsForPhase(phase, state) {
+  if (!phase || !phase.fields) return [];
+  return phase.fields
+    .filter((f) => REQUIRED_FIELDS.has(f.id))
+    .filter((f) => !String(state[f.id] || "").trim())
+    .map((f) => f.id);
+}

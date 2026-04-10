@@ -337,6 +337,31 @@ body {
   border-color: var(--accent-you);
   background: var(--panel-2);
 }
+
+/* Required-but-empty fields: red border + red label + red asterisk. */
+.field__req {
+  color: var(--blank);
+  font-weight: 800;
+  margin-left: 2px;
+}
+.field--invalid .field__label {
+  color: var(--blank);
+}
+.field--invalid .field__input,
+.field--invalid .field__textarea {
+  border-color: rgba(245, 101, 101, 0.65);
+  background: rgba(245, 101, 101, 0.06);
+}
+.field--invalid .field__input:focus,
+.field--invalid .field__textarea:focus {
+  border-color: var(--blank);
+  background: var(--panel-2);
+  box-shadow: 0 0 0 1px rgba(245, 101, 101, 0.35);
+}
+.field--invalid .field__input::placeholder,
+.field--invalid .field__textarea::placeholder {
+  color: rgba(245, 101, 101, 0.55);
+}
 .field__textarea {
   min-height: 96px;
   resize: vertical;
