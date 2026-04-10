@@ -64,19 +64,49 @@ export function mapOfpToState(ofp) {
   return patch;
 }
 
-// Fetch latest OFP. Pilot ID can be a numeric ID or username — SimBrief accepts both.
+// Fetch latest OFP. SimBrief's API uses two different parameters:
+//   userid=   — numeric Pilot ID (e.g. 123456)
+//   username= — alphanumeric SimBrief username
+// Sending a numeric Pilot ID as `username` returns 400, so we detect digits-only
+// and route to the right parameter. If the first attempt 400s we try the other
+// one as a fallback (covers users whose "username" happens to be all digits, etc).
 export async function fetchSimbrief(pilotId) {
   const id = String(pilotId || "").trim();
   if (!id) throw new Error("Enter your SimBrief Pilot ID or username first.");
 
-  const url = `${ENDPOINT}?username=${encodeURIComponent(id)}&json=1`;
-  let res;
-  try {
-    res = await fetch(url, { method: "GET", cache: "no-store" });
-  } catch (e) {
-    throw new Error("Network error — are you offline?");
+  const isNumeric = /^\d+$/.test(id);
+  const primaryParam   = isNumeric ? "userid"   : "username";
+  const fallbackParam  = isNumeric ? "username" : "userid";
+
+  const buildUrl = (param) =>
+    `${ENDPOINT}?${param}=${encodeURIComponent(id)}&json=1`;
+
+  async function tryFetch(param) {
+    let res;
+    try {
+      res = await fetch(buildUrl(param), { method: "GET", cache: "no-store" });
+    } catch {
+      throw new Error("Network error — are you offline?");
+    }
+    return res;
+  }
+
+  let res = await tryFetch(primaryParam);
+  if (res.status === 400 || res.status === 404) {
+    // Parameter or user not found — try the other parameter shape.
+    const alt = await tryFetch(fallbackParam);
+    if (alt.ok) res = alt;
+    else if (!res.ok) res = alt; // keep the worst-case response for the error below
   }
   if (!res.ok) {
+    if (res.status === 400) {
+      throw new Error(
+        "SimBrief rejected the request (400). Double-check your Pilot ID / username and that you have at least one OFP generated."
+      );
+    }
+    if (res.status === 404) {
+      throw new Error("SimBrief: pilot not found (404).");
+    }
     throw new Error(`SimBrief request failed (${res.status}).`);
   }
 
